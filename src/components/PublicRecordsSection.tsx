@@ -557,7 +557,7 @@ export function PublicRecordsSection() {
                       ) : (
                         <div className="relative h-full w-full">
                           <video
-                            src={record.file_url}
+                            src={`${record.file_url}#t=0.001`}
                             preload="metadata"
                             muted
                             playsInline
