@@ -1,0 +1,16 @@
+{
+  "name": "Apollo 11 — Rock, Pop Rock e MPB",
+  "short_name": "Apollo 11",
+  "description": "Trio de rock, pop rock e MPB de Itajubá, MG. Shows para bares, eventos e festas.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#030305",
+  "theme_color": "#E67E22",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

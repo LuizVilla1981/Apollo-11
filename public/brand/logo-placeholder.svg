@@ -1,0 +1,25 @@
+<svg width="520" height="180" viewBox="0 0 520 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logoGlow" x1="78" y1="62" x2="438" y2="132" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF2E7"/>
+      <stop offset="0.42" stop-color="#FFD7B5"/>
+      <stop offset="1" stop-color="#FFB783"/>
+    </linearGradient>
+    <radialGradient id="planet" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(108 92) rotate(90) scale(42)">
+      <stop stop-color="#9FE7FF"/>
+      <stop offset="0.58" stop-color="#3588C5"/>
+      <stop offset="1" stop-color="#122746"/>
+    </radialGradient>
+  </defs>
+  <g>
+    <circle cx="108" cy="92" r="34" fill="url(#planet)"/>
+    <ellipse cx="108" cy="92" rx="54" ry="18" stroke="#FFB783" stroke-opacity="0.8" stroke-width="6"/>
+    <path d="M84 129L101 108L118 121L137 65L151 74L131 131L114 116L99 137L84 129Z" fill="#FFB783"/>
+    <path d="M176 120V64H194L218 97L242 64H260V120H241V92L218 123L195 92V120H176Z" fill="url(#logoGlow)"/>
+    <path d="M274 120V64H293V120H274Z" fill="url(#logoGlow)"/>
+    <path d="M307 120V64H327L358 101V64H377V120H358L326 82V120H307Z" fill="url(#logoGlow)"/>
+    <path d="M394 120V64H413V102H455V120H394Z" fill="url(#logoGlow)"/>
+    <path d="M178 142H456" stroke="#FFB783" stroke-opacity="0.5" stroke-width="2"/>
+    <text x="179" y="158" fill="#DCC1B1" font-family="Space Grotesk, Arial, sans-serif" font-size="18" letter-spacing="8">APOLLO 11</text>
+  </g>
+</svg>
