@@ -16,8 +16,25 @@ const Gallery = lazy(() => import('./components/Gallery').then((module) => ({ de
 const PublicRecordsSection = lazy(() => import('./components/PublicRecordsSection').then((module) => ({ default: module.PublicRecordsSection })));
 const Testimonials = lazy(() => import('./components/Testimonials').then((module) => ({ default: module.Testimonials })));
 const Contact = lazy(() => import('./components/Contact').then((module) => ({ default: module.Contact })));
+const AdminPanel = lazy(() => import('./components/admin/AdminPanel'));
+
+const isAdminRoute = window.location.pathname === '/admin';
 
 export default function App() {
+  if (isAdminRoute) {
+    return (
+      <Suspense
+        fallback={
+          <div className="flex min-h-screen items-center justify-center bg-surface">
+            <div className="h-7 w-7 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          </div>
+        }
+      >
+        <AdminPanel />
+      </Suspense>
+    );
+  }
+
   return (
     <ToastProvider>
       <div className="relative min-h-screen overflow-x-hidden bg-[#030305] text-on-surface">

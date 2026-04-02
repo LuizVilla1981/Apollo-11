@@ -26,7 +26,7 @@ create table if not exists public.public_records (
   file_url text not null,
   file_type text not null,
   mime_type text null,
-  approved boolean default true,
+  approved boolean default false,
   consent_repost boolean default false
 );
 
