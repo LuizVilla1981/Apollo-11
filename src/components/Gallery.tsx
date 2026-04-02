@@ -1,8 +1,9 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronLeft, ChevronRight, Play } from 'lucide-react';
 
 import type { GalleryItem } from './GalleryLightbox';
+import { supabase } from '../lib/supabaseClient';
 
 const GalleryLightbox = lazy(() => import('./GalleryLightbox').then((module) => ({ default: module.GalleryLightbox })));
 
@@ -57,17 +58,44 @@ export function Gallery() {
   const [page, setPage] = useState(0);
   const [activeCategory, setActiveCategory] = useState<GalleryCategory>('all');
   const [selectedItem, setSelectedItem] = useState<GalleryItem | null>(null);
+  const [dynamicItems, setDynamicItems] = useState<GalleryItem[]>([]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase
+      .from('gallery_items')
+      .select('*')
+      .eq('visible', true)
+      .order('display_order', { ascending: true })
+      .then(({ data }) => {
+        if (!data) return;
+        const mapped = data.map((row: { id: string; file_url: string; file_type: string; alt: string | null; label: string | null; poster_url: string | null }, i: number): GalleryItem => ({
+          id: 10000 + i,
+          src: row.file_url,
+          type: row.file_type as 'image' | 'video',
+          alt: row.alt ?? (row.file_type === 'video' ? 'Vídeo' : 'Foto'),
+          label: row.label ?? undefined,
+          poster: row.poster_url ?? undefined,
+        }));
+        setDynamicItems(mapped);
+      });
+  }, []);
+
+  const allItems = useMemo(() => [...galleryItems, ...dynamicItems], [dynamicItems]);
+
+  const allImageItems = useMemo(() => allItems.filter((item) => item.type === 'image'), [allItems]);
+  const allVideoItems = useMemo(() => allItems.filter((item) => item.type === 'video'), [allItems]);
 
   const filteredItems = activeCategory === 'all'
-    ? galleryItems
+    ? allItems
     : activeCategory === 'image'
-      ? imageItems
-      : videoItems;
+      ? allImageItems
+      : allVideoItems;
 
   const categoryCounts: Record<GalleryCategory, number> = {
-    all: galleryItems.length,
-    image: imageItems.length,
-    video: videoItems.length,
+    all: allItems.length,
+    image: allImageItems.length,
+    video: allVideoItems.length,
   };
 
   useEffect(() => {

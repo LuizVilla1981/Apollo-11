@@ -6,6 +6,7 @@ import {
   CheckSquare,
   Eye,
   EyeOff,
+  Image,
   Instagram,
   LoaderCircle,
   LogOut,
@@ -15,6 +16,7 @@ import {
   Search,
   Square,
   Trash2,
+  Upload,
   X,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
@@ -73,9 +75,23 @@ type IgRequest = {
   status: string;
 };
 
+type GalleryDBItem = {
+  id: string;
+  created_at: string;
+  file_path: string;
+  file_url: string;
+  file_type: 'image' | 'video';
+  alt: string | null;
+  label: string | null;
+  poster_path: string | null;
+  poster_url: string | null;
+  display_order: number;
+  visible: boolean;
+};
+
 type RecordFilter = 'all' | 'pending' | 'approved';
 type GenericFilter = 'all' | 'pending' | 'done';
-type Tab = 'records' | 'bookings' | 'songs' | 'instagram';
+type Tab = 'records' | 'bookings' | 'songs' | 'instagram' | 'gallery';
 
 /* --- Audit helper ------------------------------------------- */
 
@@ -739,6 +755,201 @@ function InstagramTab({ session }: { session: Session }) {
   );
 }
 
+/* --- Tab: Gallery ------------------------------------------- */
+
+function GalleryTab({ session }: { session: Session }) {
+  const [items, setItems] = useState<GalleryDBItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<GalleryDBItem | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!supabase) return;
+    setLoading(true);
+    const { data, error } = await supabase.from('gallery_items').select('*').order('display_order', { ascending: true }).order('created_at', { ascending: false });
+    if (error) reportError('[Admin] Failed to load gallery.', error);
+    setItems((data ?? []) as GalleryDBItem[]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const getFileType = (file: File): 'image' | 'video' => file.type.startsWith('video/') ? 'video' : 'image';
+
+  const uploadFiles = async (files: FileList | File[]) => {
+    if (!supabase || files.length === 0) return;
+    setUploading(true);
+    const maxOrder = items.reduce((max, i) => Math.max(max, i.display_order), 0);
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+      const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const filePath = `gallery/${safeName}`;
+      const fileType = getFileType(file);
+
+      const { error: uploadError } = await supabase.storage.from('gallery').upload(filePath, file, { contentType: file.type });
+      if (uploadError) { reportError('[Admin] Gallery upload failed.', uploadError); continue; }
+
+      const { data: urlData } = supabase.storage.from('gallery').getPublicUrl(filePath);
+      const fileUrl = urlData.publicUrl;
+
+      const label = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+
+      const { error: insertError } = await supabase.from('gallery_items').insert({
+        file_path: filePath,
+        file_url: fileUrl,
+        file_type: fileType,
+        alt: fileType === 'video' ? `Vídeo: ${label}` : `Foto da galeria`,
+        label: fileType === 'video' ? label : null,
+        display_order: maxOrder + i + 1,
+      });
+      if (insertError) reportError('[Admin] Gallery insert failed.', insertError);
+      await logAction(session.user.email ?? '', 'gallery_upload', 'gallery_items', 'new', { file_name: file.name });
+    }
+    await load();
+    setUploading(false);
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) void uploadFiles(e.target.files);
+    e.target.value = '';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files.length > 0) void uploadFiles(e.dataTransfer.files);
+  };
+
+  const toggleVisibility = async (item: GalleryDBItem) => {
+    if (!supabase) return;
+    setBusy(true);
+    const { error } = await supabase.from('gallery_items').update({ visible: !item.visible }).eq('id', item.id);
+    if (!error) {
+      setItems((prev) => prev.map((r) => (r.id === item.id ? { ...r, visible: !item.visible } : r)));
+      await logAction(session.user.email ?? '', item.visible ? 'gallery_hide' : 'gallery_show', 'gallery_items', item.id);
+    }
+    setBusy(false);
+  };
+
+  const confirmDelete = async () => {
+    if (!supabase || !deleteTarget) return;
+    setBusy(true);
+    await supabase.storage.from('gallery').remove([deleteTarget.file_path]);
+    if (deleteTarget.poster_path) await supabase.storage.from('gallery').remove([deleteTarget.poster_path]);
+    const { error } = await supabase.from('gallery_items').delete().eq('id', deleteTarget.id);
+    if (!error) {
+      setItems((prev) => prev.filter((r) => r.id !== deleteTarget.id));
+      await logAction(session.user.email ?? '', 'delete', 'gallery_items', deleteTarget.id);
+    }
+    setDeleteTarget(null);
+    setBusy(false);
+  };
+
+  const moveItem = async (item: GalleryDBItem, direction: 'up' | 'down') => {
+    if (!supabase) return;
+    const idx = items.findIndex((i) => i.id === item.id);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= items.length) return;
+    setBusy(true);
+    const other = items[swapIdx];
+    await Promise.all([
+      supabase.from('gallery_items').update({ display_order: other.display_order }).eq('id', item.id),
+      supabase.from('gallery_items').update({ display_order: item.display_order }).eq('id', other.id),
+    ]);
+    await load();
+    setBusy(false);
+  };
+
+  const visibleCount = items.filter((i) => i.visible).length;
+
+  return (
+    <>
+      {/* Upload area */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        className={`relative mb-6 flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-8 transition ${dragOver ? 'border-primary bg-primary/5' : 'border-outline-variant/30 bg-surface-container'}`}
+      >
+        {uploading ? (
+          <LoaderCircle size={28} className="animate-spin text-primary" />
+        ) : (
+          <>
+            <Upload size={32} className="text-on-surface-variant/60" />
+            <p className="text-sm text-on-surface-variant">Arraste fotos ou vídeos aqui, ou</p>
+            <label className="cursor-pointer rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary transition hover:brightness-110">
+              Escolher arquivos
+              <input type="file" multiple accept="image/*,video/*" onChange={handleFileInput} className="hidden" />
+            </label>
+            <p className="text-xs text-on-surface-variant/60">JPG, PNG, WEBP, MP4 — múltiplos arquivos</p>
+          </>
+        )}
+      </div>
+
+      {/* Info bar */}
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-on-surface-variant">{items.length} itens na galeria ({visibleCount} visíveis)</p>
+        <button type="button" onClick={() => void load()} disabled={loading} className="flex items-center gap-1.5 rounded-full bg-surface-container-high px-3 py-1.5 text-xs text-on-surface-variant transition hover:text-on-surface disabled:opacity-40">
+          <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />Atualizar
+        </button>
+      </div>
+
+      {/* Items grid */}
+      {loading ? (
+        <div className="flex items-center justify-center py-20"><LoaderCircle size={28} className="animate-spin text-primary" /></div>
+      ) : items.length === 0 ? (
+        <p className="py-20 text-center text-on-surface-variant">Nenhum item na galeria. Faça upload acima.</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+          <AnimatePresence mode="popLayout">
+            {items.map((item, idx) => (
+              <motion.div key={item.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+                className={`group relative overflow-hidden rounded-2xl border bg-surface-container transition ${item.visible ? 'border-outline-variant/20' : 'border-outline-variant/10 opacity-50'}`}>
+                <div className="relative aspect-square overflow-hidden bg-black">
+                  {item.file_type === 'video' ? (
+                    <video src={item.file_url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
+                  ) : (
+                    <img src={item.file_url} alt={item.alt ?? ''} className="h-full w-full object-cover" loading="lazy" />
+                  )}
+                  {item.file_type === 'video' && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none"><Play size={28} className="text-white/70" fill="currentColor" /></div>
+                  )}
+                  <span className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[10px] font-semibold ${item.visible ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-500/20 text-zinc-400'}`}>
+                    {item.visible ? 'Visível' : 'Oculto'}
+                  </span>
+                  <span className="absolute top-2 right-2 rounded-full bg-black/50 px-2 py-0.5 text-[10px] text-white/70">#{idx + 1}</span>
+                </div>
+                <div className="p-2 space-y-1">
+                  {item.label && <p className="text-xs font-medium text-on-surface truncate">{item.label}</p>}
+                  <p className="text-[10px] text-on-surface-variant/60">{item.file_type === 'video' ? 'Vídeo' : 'Foto'} • {new Date(item.created_at).toLocaleDateString('pt-BR')}</p>
+                </div>
+                <div className="flex border-t border-outline-variant/20 text-[10px]">
+                  <button type="button" onClick={() => moveItem(item, 'up')} disabled={busy || idx === 0} className="flex-1 py-2 text-on-surface-variant transition hover:bg-surface-container-high disabled:opacity-30">▲</button>
+                  <div className="w-px bg-outline-variant/20" />
+                  <button type="button" onClick={() => moveItem(item, 'down')} disabled={busy || idx === items.length - 1} className="flex-1 py-2 text-on-surface-variant transition hover:bg-surface-container-high disabled:opacity-30">▼</button>
+                  <div className="w-px bg-outline-variant/20" />
+                  <button type="button" onClick={() => toggleVisibility(item)} disabled={busy} className="flex-1 py-2 transition hover:bg-surface-container-high disabled:opacity-30">
+                    {item.visible ? <span className="text-amber-400">Ocultar</span> : <span className="text-emerald-400">Mostrar</span>}
+                  </button>
+                  <div className="w-px bg-outline-variant/20" />
+                  <button type="button" onClick={() => setDeleteTarget(item)} disabled={busy} className="flex-1 py-2 text-rose-400 transition hover:bg-rose-500/10 disabled:opacity-30">Deletar</button>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
+      <AnimatePresence>
+        {deleteTarget && <ConfirmDialog message="Deletar este item da galeria permanentemente?" onConfirm={confirmDelete} onCancel={() => setDeleteTarget(null)} />}
+      </AnimatePresence>
+    </>
+  );
+}
+
 /* --- Dashboard ---------------------------------------------- */
 
 const TAB_CONFIG: { key: Tab; label: string; icon: typeof Calendar }[] = [
@@ -746,11 +957,12 @@ const TAB_CONFIG: { key: Tab; label: string; icon: typeof Calendar }[] = [
   { key: 'bookings', label: 'Shows', icon: Calendar },
   { key: 'songs', label: 'Músicas', icon: Music },
   { key: 'instagram', label: 'Instagram', icon: Instagram },
+  { key: 'gallery', label: 'Galeria', icon: Image },
 ];
 
 function AdminDashboard({ session }: { session: Session }) {
   const [tab, setTab] = useState<Tab>('records');
-  const [pendingCounts, setPendingCounts] = useState({ records: 0, bookings: 0, songs: 0, instagram: 0 });
+  const [pendingCounts, setPendingCounts] = useState({ records: 0, bookings: 0, songs: 0, instagram: 0, gallery: 0 });
 
   useEffect(() => {
     if (!supabase) return;
@@ -762,7 +974,7 @@ function AdminDashboard({ session }: { session: Session }) {
         sb.from('song_suggestions').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
         sb.from('ig_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
       ]);
-      setPendingCounts({ records: r1.count ?? 0, bookings: r2.count ?? 0, songs: r3.count ?? 0, instagram: r4.count ?? 0 });
+      setPendingCounts({ records: r1.count ?? 0, bookings: r2.count ?? 0, songs: r3.count ?? 0, instagram: r4.count ?? 0, gallery: 0 });
     };
     void loadCounts();
     const interval = setInterval(loadCounts, 30_000);
@@ -809,6 +1021,7 @@ function AdminDashboard({ session }: { session: Session }) {
         {tab === 'bookings' && <BookingsTab session={session} />}
         {tab === 'songs' && <SongsTab session={session} />}
         {tab === 'instagram' && <InstagramTab session={session} />}
+        {tab === 'gallery' && <GalleryTab session={session} />}
       </div>
     </div>
   );
