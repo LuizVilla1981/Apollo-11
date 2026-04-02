@@ -121,7 +121,7 @@ function AdminLogin({ onSession }: { onSession: (s: Session) => void }) {
   if (!supabase) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface px-4">
-        <p className="text-on-surface-variant">Supabase n\u00e3o configurado.</p>
+        <p className="text-on-surface-variant">Supabase não configurado.</p>
       </div>
     );
   }
@@ -188,7 +188,7 @@ function RecordCard({ record, selected, onToggleSelect, onToggleApproval, onDele
   onToggleApproval: (r: PublicRecord) => void; onDelete: (r: PublicRecord) => void;
   onOpen: (r: PublicRecord) => void; busy: boolean;
 }) {
-  const meta = [record.city, record.venue].filter(Boolean).join(' \u2022 ');
+  const meta = [record.city, record.venue].filter(Boolean).join(' • ');
   const date = record.event_date ? new Date(record.event_date + 'T12:00:00').toLocaleDateString('pt-BR') : null;
 
   return (
@@ -243,7 +243,7 @@ function StatusPill({ status }: { status: string }) {
     responded: { bg: 'bg-blue-500/20', text: 'text-blue-400', label: 'Respondido' },
     closed: { bg: 'bg-zinc-500/20', text: 'text-zinc-400', label: 'Fechado' },
     added: { bg: 'bg-emerald-500/20', text: 'text-emerald-400', label: 'Adicionada' },
-    done: { bg: 'bg-emerald-500/20', text: 'text-emerald-400', label: 'Conclu\u00eddo' },
+    done: { bg: 'bg-emerald-500/20', text: 'text-emerald-400', label: 'Concluído' },
   };
   const s = map[status] ?? map.pending;
   return <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${s.bg} ${s.text}`}>{s.label}</span>;
@@ -485,7 +485,7 @@ function BookingsTab({ session }: { session: Session }) {
       {loading ? (
         <div className="flex items-center justify-center py-20"><LoaderCircle size={28} className="animate-spin text-primary" /></div>
       ) : filtered.length === 0 ? (
-        <p className="py-20 text-center text-on-surface-variant">Nenhuma solicita\u00e7\u00e3o.</p>
+        <p className="py-20 text-center text-on-surface-variant">Nenhuma solicitação.</p>
       ) : (
         <div className="space-y-3">
           <AnimatePresence mode="popLayout">
@@ -498,8 +498,8 @@ function BookingsTab({ session }: { session: Session }) {
                       <span className="font-semibold text-on-surface">{row.city}</span>
                       <StatusPill status={row.status} />
                     </div>
-                    <p className="text-sm text-on-surface-variant">{row.event_type} \u2022 {row.duration} \u2022 {new Date(row.event_date + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
-                    <p className="text-sm text-on-surface-variant">Forma\u00e7\u00e3o: {row.formation_preference} \u2022 Som/Luz: {row.venue_has_sound_light ? 'Sim' : 'N\u00e3o'}</p>
+                    <p className="text-sm text-on-surface-variant">{row.event_type} • {row.duration} • {new Date(row.event_date + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+                    <p className="text-sm text-on-surface-variant">Formação: {row.formation_preference} • Som/Luz: {row.venue_has_sound_light ? 'Sim' : 'Não'}</p>
                     <p className="text-sm text-on-surface">WhatsApp: <a href={`https://wa.me/${row.contact_whatsapp.replace(/\\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-primary underline">{row.contact_whatsapp}</a></p>
                     {row.notes && <p className="text-xs text-on-surface-variant/80 mt-1">{row.notes}</p>}
                     <p className="text-[10px] text-on-surface-variant/50">{new Date(row.created_at).toLocaleString('pt-BR')}</p>
@@ -516,7 +516,7 @@ function BookingsTab({ session }: { session: Session }) {
         </div>
       )}
       <AnimatePresence>
-        {deleteTarget && <ConfirmDialog message="Deletar esta solicita\u00e7\u00e3o de show?" onConfirm={confirmDelete} onCancel={() => setDeleteTarget(null)} />}
+        {deleteTarget && <ConfirmDialog message="Deletar esta solicitação de show?" onConfirm={confirmDelete} onCancel={() => setDeleteTarget(null)} />}
       </AnimatePresence>
     </>
   );
@@ -593,7 +593,7 @@ function SongsTab({ session }: { session: Session }) {
       {loading ? (
         <div className="flex items-center justify-center py-20"><LoaderCircle size={28} className="animate-spin text-primary" /></div>
       ) : filtered.length === 0 ? (
-        <p className="py-20 text-center text-on-surface-variant">Nenhuma sugest\u00e3o.</p>
+        <p className="py-20 text-center text-on-surface-variant">Nenhuma sugestão.</p>
       ) : (
         <div className="space-y-2">
           <AnimatePresence mode="popLayout">
@@ -687,7 +687,7 @@ function InstagramTab({ session }: { session: Session }) {
     <>
       <div className="flex flex-wrap items-center gap-2 mb-4">
         {(['all', 'pending', 'done'] as GenericFilter[]).map((f) => {
-          const labels: Record<GenericFilter, string> = { all: 'Todos', pending: 'Pendentes', done: 'Conclu\u00eddos' };
+          const labels: Record<GenericFilter, string> = { all: 'Todos', pending: 'Pendentes', done: 'Concluídos' };
           return (
             <button key={f} type="button" onClick={() => setFilter(f)}
               className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${filter === f ? 'bg-primary text-on-primary' : 'bg-surface-container-high text-on-surface-variant hover:text-on-surface'}`}>
@@ -744,7 +744,7 @@ function InstagramTab({ session }: { session: Session }) {
 const TAB_CONFIG: { key: Tab; label: string; icon: typeof Calendar }[] = [
   { key: 'records', label: 'Registros', icon: Eye },
   { key: 'bookings', label: 'Shows', icon: Calendar },
-  { key: 'songs', label: 'M\u00fasicas', icon: Music },
+  { key: 'songs', label: 'Músicas', icon: Music },
   { key: 'instagram', label: 'Instagram', icon: Instagram },
 ];
 
@@ -777,7 +777,7 @@ function AdminDashboard({ session }: { session: Session }) {
       <header className="sticky top-0 z-30 border-b border-outline-variant/20 bg-surface-container/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-            <a href="/" className="text-sm text-on-surface-variant transition hover:text-on-surface">{'\u2190'} Voltar</a>
+            <a href="/" className="text-sm text-on-surface-variant transition hover:text-on-surface">← Voltar</a>
             <span className="text-on-surface-variant/30">|</span>
             <h1 className="text-sm font-bold text-on-surface sm:text-base">Painel Admin</h1>
             {totalPending > 0 && <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-xs font-semibold text-amber-400">{totalPending} pendente{totalPending > 1 ? 's' : ''}</span>}
